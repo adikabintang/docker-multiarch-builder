@@ -28,7 +28,7 @@ if [[ $(uname -s) != "Darwin" ]]; then
   mkdir -p ${ABS_DEST}/qemu ${ABS_FROM}/qemu
   for target_arch in ${BUILD_ARCHS}; do
     [[ -f ${ABS_FROM}/qemu/x86_64_qemu-${target_arch}-static.tar.gz ]] || wget -N -P ${ABS_FROM}/qemu https://github.com/multiarch/qemu-user-static/releases/download/${QEMU_VERSION}/x86_64_qemu-${target_arch}-static.tar.gz
-    tar -xvf ${ABS_FROM}/qemu/x86_64_qemu-${target_arch}-static.tar.gz -C ${ABS_DEST}
+    tar -xvf ${ABS_FROM}/qemu/x86_64_qemu-${target_arch}-static.tar.gz -C ${ABS_DEST}/qemu
   done
 else
   echo INFO: Running on Mac, skipping Qemu build.
