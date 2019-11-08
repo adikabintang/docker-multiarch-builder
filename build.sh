@@ -30,6 +30,12 @@ if [[ -z "${REPO}" || -z "${IMAGE_NAME}" || -z "${TARGET_ARCHES}" ]]; then
   exit 1
 fi
 
+if [[ -z "$(DOCKER_CLI_PATH)" ]]; then
+    DOCKER_CLI_PATH="$(command -v docker)"
+fi
+
+echo "Using $(DOCKER_CLI_PATH) as Docker."
+
 # Determine OS and Arch.
 build_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 build_uname_arch="$(uname -m | tr '[:upper:]' '[:lower:]')"
