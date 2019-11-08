@@ -13,18 +13,31 @@ else
   exit 1
 fi
 
-# Fail on empty params
+# Fail on invalid config
+if [[ -n "${REPO}" ]] && [[ -n "${REGISTRY}" || -n "${REPOSITORY}" ]]; then
+  echo "ERROR: Invalid config, REPO cannot be set if REGISTRY and/or REPOSITORY are set."
+  exit 1
+fi
+
+# display warning if REPO is set as it is deprecated
+if [[ -n "${REPO}" ]]; then
+  echo "WARNING: Deprecated: the REPO config option is deprecated. Use REGISTRY and/or REPOSITORY instead."
+fi
+
 if [[ -z "${REGISTRY}" ]]; then
     REPO="${REPOSITORY}"
 elif [[ -n "${REPOSITORY}" ]]; then
     REPO="${REGISTRY}/${REPOSITORY}"
 elif [[ -n "${REGISTRY}" ]]; then
     REPO="${REGISTRY}"
+elif [[ -n "${REPO}" ]]; then
+    :
 else
   echo "ERROR: Please set at least REGISTRY or REPOSITORY in build.conf."
   exit 1
 fi
 
+# Fail on empty params
 if [[ -z "${REPO}" || -z "${IMAGE_NAME}" || -z "${TARGET_ARCHES}" ]]; then
   echo "ERROR: Please set build parameters." 1>&2
   exit 1
