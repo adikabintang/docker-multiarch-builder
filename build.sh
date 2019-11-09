@@ -17,24 +17,22 @@ fi
 if [[ -n "${REPO}" ]] && [[ -n "${REGISTRY}" || -n "${REPOSITORY}" ]]; then
   echo "ERROR: Invalid config, REPO cannot be set if REGISTRY and/or REPOSITORY are set."
   exit 1
-fi
-
-# display warning if REPO is set as it is deprecated
-if [[ -n "${REPO}" ]]; then
-  echo "WARNING: Deprecated: the REPO config option is deprecated. Use REGISTRY and/or REPOSITORY instead."
-fi
-
-if [[ -z "${REGISTRY}" ]]; then
-    REPO="${REPOSITORY}"
-elif [[ -n "${REPOSITORY}" ]]; then
-    REPO="${REGISTRY}/${REPOSITORY}"
-elif [[ -n "${REGISTRY}" ]]; then
-    REPO="${REGISTRY}"
-elif [[ -n "${REPO}" ]]; then
-    :
 else
-  echo "ERROR: Please set at least REGISTRY or REPOSITORY in build.conf."
-  exit 1
+    if [[ -n "${REPO}" ]]; then
+        # display warning if REPO is set as it is deprecated
+        echo "WARNING: Deprecated: the REPO config option is deprecated. Use REGISTRY and/or REPOSITORY instead."
+    else
+        if [[ -z "${REGISTRY}" ]]; then
+            REPO="${REPOSITORY}"
+        elif [[ -n "${REPOSITORY}" ]]; then
+            REPO="${REGISTRY}/${REPOSITORY}"
+        elif [[ -n "${REGISTRY}" ]]; then
+            REPO="${REGISTRY}"
+        else
+          echo "ERROR: Please set at least REGISTRY or REPOSITORY in build.conf."
+          exit 1
+        fi
+    fi
 fi
 
 # Fail on empty params
@@ -42,12 +40,6 @@ if [[ -z "${REPO}" || -z "${IMAGE_NAME}" || -z "${TARGET_ARCHES}" ]]; then
   echo "ERROR: Please set build parameters." 1>&2
   exit 1
 fi
-
-if [[ -z "$(DOCKER_CLI_PATH)" ]]; then
-    DOCKER_CLI_PATH="$(command -v docker)"
-fi
-
-echo "Using $(DOCKER_CLI_PATH) as Docker."
 
 # Determine OS and Arch.
 build_os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -63,8 +55,16 @@ case "${build_uname_arch}" in
     ;;
 esac
 
-if [[ ! $(DOCKER_CLI_EXPERIMENTAL="enabled" docker manifest --help) ]] || [[ "$(DOCKER_CLI_EXPERIMENTAL="enabled" docker manifest --help | grep -c "docker manifest is only supported on a Docker cli with experimental cli features enabled")" -eq 1 ]]; then
-  echo "ERROR: Missing Docker CLI with manifest command \(command tried: ${DOCKER_COMMAND}\)"
+if [[ -z "${DOCKER_CLI_PATH}" ]]; then
+    DOCKER_COMMAND="$(command -v docker)"
+else
+    DOCKER_COMMAND="$( type -P docker-"${build_os}"-"${build_arch}" || type -P "${DOCKER_CLI_PATH%/}"/docker-"${build_os}"-"${build_arch}" || echo "docker-not-found" )"
+fi
+
+echo "Using ${DOCKER_COMMAND} as Docker."
+
+if [[ ! $(DOCKER_CLI_EXPERIMENTAL="enabled" "${DOCKER_COMMAND}" manifest --help) ]] || [[ "$(DOCKER_CLI_EXPERIMENTAL="enabled" "${DOCKER_COMMAND}" manifest --help | grep -c "docker manifest is only supported on a Docker cli with experimental cli features enabled")" -eq 1 ]]; then
+  echo "ERROR: Missing Docker CLI with manifest command (command tried: ${DOCKER_COMMAND})"
   echo "ERROR: Maybe you deen a more recent Docker."
   exit 1
 fi
@@ -102,8 +102,8 @@ for docker_arch in ${TARGET_ARCHES}; do
   else
     sed -i "s/__CROSS_//g" "Dockerfile.${docker_arch}"
   fi
-  DOCKER_CLI_EXPERIMENTAL="enabled" docker build -f "Dockerfile.${docker_arch}" -t "${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}" .
-  DOCKER_CLI_EXPERIMENTAL="enabled" docker push "${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}"
+  "${DOCKER_COMMAND}" build -f "Dockerfile.${docker_arch}" -t "${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}" .
+  "${DOCKER_COMMAND}" push "${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}"
   arch_images="${arch_images} ${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}"
   rm "Dockerfile.${docker_arch}"
 done
@@ -120,7 +120,7 @@ fi
 if [ -d "${HOME}/.docker/manifests/${local_manifest_dir_name}" ]; then
       rm -rf "${HOME}/.docker/manifests/${local_manifest_dir_name}"
 fi
-DOCKER_CLI_EXPERIMENTAL="enabled" docker manifest create --amend "${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}" "${arch_images}"
+DOCKER_CLI_EXPERIMENTAL="enabled" "${DOCKER_COMMAND}" manifest create --amend "${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}" ${arch_images}
 for docker_arch in ${TARGET_ARCHES}; do
   case ${docker_arch} in
     amd64       ) annotate_flags="" ;;
@@ -128,7 +128,7 @@ for docker_arch in ${TARGET_ARCHES}; do
     arm64v8     ) annotate_flags="--os linux --arch arm64 --variant armv8" ;;
   esac
   echo "INFO: Annotating arch: ${docker_arch} with \"${annotate_flags}\""
-  DOCKER_CLI_EXPERIMENTAL="enabled" docker manifest annotate "${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}" "${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}" "${annotate_flags}"
+  DOCKER_CLI_EXPERIMENTAL="enabled" "${DOCKER_COMMAND}" manifest annotate "${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}" "${REPO}/${IMAGE_NAME}:${docker_arch}-${IMAGE_VERSION}" ${annotate_flags}
 done
 echo "INFO: Pushing ${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}"
-DOCKER_CLI_EXPERIMENTAL="enabled" docker manifest push "${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}"
+DOCKER_CLI_EXPERIMENTAL="enabled" "${DOCKER_COMMAND}" manifest push "${REPO}/${IMAGE_NAME}:${IMAGE_VERSION}"
