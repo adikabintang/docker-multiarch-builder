@@ -4,33 +4,19 @@
 
 set -e
 
-if [[ ! $(type -P docker) ]]; then
-  echo ERROR: No docker installer. 1>&2
-  exit 1
+CWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=utils.sh
+source "${CWD}"/utils.sh
+
+if ! checkbinary docker; then
+    exit 1
 fi
 
-if [[ ! $(type -P make) ]]; then
-  echo ERROR: No docker installer. 1>&2
-  exit 1
+if ! checkbinary qemu-arm-static || ! checkbinary qemu-x86_64-static; then
+    echo "INFO: it looks like qemu-user-static is not installed, you should really install it if it is possible"
 fi
 
-
-echo "INFO: Getting new docker CLI"
-if [ ! -d cli ]; then
-  git clone -b manifest-cmd https://github.com/clnperez/cli.git || \
-    echo ERROR: Could not clone the repository 1>&2 &&
-  cd cli
-else
-  cd cli
-  git pull
-fi
-make -f docker.Makefile cross
-
-export PATH=${PATH}:$(pwd)/build
-echo "INFO: You should permanently add $(pwd)/build to your \$PATH"
-echo "$ echo export PATH=${PATH}:$(pwd)/build >> ~/.profile"
-
-if [ $(uname -s) != "Darwin" ]; then
+if [ "$(uname -s)" != "Darwin" ]; then
   echo "INFO: Registering handlers - requires sudo!"
   sudo docker run --rm --privileged multiarch/qemu-user-static:register
 fi

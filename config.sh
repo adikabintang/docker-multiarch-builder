@@ -1,0 +1,2 @@
+QEMU_VERSION="v4.1.0-1"
+BUILD_ARCHS="x86_64 aarch64 arm"
